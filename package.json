@@ -3,20 +3,39 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently \"next dev\" \"npm run start-colyseus\" \"run open-browser\"",
+    "open-browser": "start http://localhost:3000/client",
+    "start-colyseus": "cd server && npm start",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@babylonjs/core": "^6.15.0",
+    "@babylonjs/inspector": "^6.15.0",
+    "@babylonjs/loaders": "^6.15.0",
     "@types/node": "20.4.9",
-    "@types/react": "18.2.20",
+    "@types/react": "18.2.19",
     "@types/react-dom": "18.2.7",
-    "eslint": "8.47.0",
+    "babylonjs": "^6.15.0",
+    "babylonjs-gui": "^6.16.0",
+    "bufferutil": "^4.0.7",
+    "cannon": "^0.6.2",
+    "colyseus.js": "^0.15.11",
+    "eslint": "8.46.0",
     "eslint-config-next": "13.4.13",
     "next": "13.4.13",
     "react": "18.2.0",
+    "react-babylonjs": "^3.1.17",
     "react-dom": "18.2.0",
-    "typescript": "5.1.6"
+    "react-redux": "^8.1.2",
+    "redux": "^4.2.1",
+    "typescript": "5.1.6",
+    "utf-8-validate": "^6.0.3",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/cannon": "^0.1.8",
+    "concurrently": "^8.2.0"
   }
 }

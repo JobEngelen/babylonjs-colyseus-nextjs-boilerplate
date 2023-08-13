@@ -1,95 +1,56 @@
-import Image from 'next/image'
-import styles from './page.module.css'
+'use client';
+import { client } from "@/Instances/ColyseusClient";
+import { useEffect, useState } from "react";
 
-export default function Home() {
+
+const Home = () => {
+  const [rooms, setRooms] = useState([]);
+
+  const fetchRooms = async () => {
+    const availableRooms: any = await client.getAvailableRooms('your-room-type');
+    setRooms(availableRooms);
+  };
+
+  useEffect(() => {
+    fetchRooms();
+
+    const interval = setInterval(() => {
+      fetchRooms();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const createRoom = async () => {
+    const room = await client.create('your-room-type');
+    window.open(`/room/${room.id}`);
+  };
+
+  const joinRoom = (roomId: string) => {
+    window.open(`/room/${roomId}`);
+  };
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+    <>
+      <h1>WIP</h1>
+      <hr />
+      <button onClick={createRoom}>Create room</button>
+      <hr />
+      <h2>Rooms</h2>
+      {rooms.length === 0 ? <p>No rooms available</p>
+        :
+        <ul>
+          {rooms.map((room: any, index: any) => (
+            <li key={index}>
+              <b>Room:</b> {room.roomId} - {room.clients} / {room.maxClients}{' '}
+              <button onClick={() => joinRoom(room.roomId)}>Join</button>
+            </li>
+          ))}
+        </ul>
+      }
 
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+    </>
 
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore the Next.js 13 playground.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+  );
 }
+
+export default Home;
