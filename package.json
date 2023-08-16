@@ -3,8 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"npm run start-colyseus\" \"run open-browser\"",
-    "open-browser": "start http://localhost:3000/client",
+    "dev": "concurrently \"next dev\" \"npm run start-colyseus\"",
     "start-colyseus": "cd server && npm start",
     "build": "next build",
     "start": "next start",
