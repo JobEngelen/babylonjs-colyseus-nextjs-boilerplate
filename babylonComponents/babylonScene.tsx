@@ -1,190 +1,129 @@
 import React, { useEffect, useRef } from 'react';
-import * as BABYLON from '@babylonjs/core';
-import '@babylonjs/loaders';
+import * as BABYLON from 'babylonjs';
+import { createScene } from '@/assets/createScene';
 import { Room } from 'colyseus.js';
 import { MyRoomState, Player } from '@/server/src/rooms/schema/MyRoomState';
-import { IPlayerData } from '@/interfaces/PlayerDataInterface';
+import { ICustomScene } from '@/interfaces/CustomSceneInterface';
+import { createExistingPlayers } from '@/assets/createExistingPlayers';
+import { createNewPlayers } from '@/assets/createNewPlayer';
+import { createGUI } from '@/assets/createGUI';
 
 interface BabylonSceneProps {
-  room: Room<MyRoomState>;
-  players: Player[];
-  client_id: string;
+    room: Room<MyRoomState>;
+    players: Player[];
+    client_id: string;
+    newestPlayer: Player | null;
+    playerLeft: string;
+    chatMessages: string[];
 }
 
-const BabylonScene = ({ room, players, client_id }: BabylonSceneProps) => {
-  const canvasRef = useRef(null);
-  const sceneRef = useRef<BABYLON.Scene | null>(null);
-  const instanceMeshesRef = useRef<Map<string, BABYLON.InstancedMesh>>(new Map());
-  const groundRef = useRef<BABYLON.Mesh | null>(null);
-  const cylinderMeshRef = useRef<BABYLON.Mesh | null>(null);
+export default function BabylonScene(
+    {
+        room,
+        players,
+        client_id,
+        newestPlayer,
+        playerLeft,
+        chatMessages
+    }: BabylonSceneProps) {
 
-  // Initialize the scene when the component mounts
-  const initializeScene = () => {
-    const engine = new BABYLON.Engine(canvasRef.current, true);
-    const scene = new BABYLON.Scene(engine);
+    const canvasRef = useRef(null);
+    const mounted = useRef(false);
+    const mountedExistingPlayers = useRef(false);
+    const sceneRef = useRef<ICustomScene | null>(null);
 
-    sceneRef.current = scene;
-    setupCamera(scene);
-    setupLight(scene);
-    setupGround(scene);
-    setupCylinderMesh(scene);
+    // Create the scene
+    useEffect(() => {
+        if (
+            typeof window !== 'undefined' &&
+            canvasRef.current &&
+            players.length > 0 &&
+            client_id &&
+            !mounted.current
+        ) {
 
-    const animate = () => {
-      scene.render();
-    };
+            const clientPlayer = players.find((player) => player.id === client_id);
+            if (!clientPlayer) return;
 
-    engine.runRenderLoop(animate);
+            // Set the flag to indicate that the component has mounted
+            mounted.current = true;
 
-    const resize = () => {
-      engine.resize();
-    };
+            const engine = new BABYLON.Engine(canvasRef.current, true);
+            const renderScene = createScene(room, client_id, engine, canvasRef.current, clientPlayer);
 
-    window.addEventListener('resize', resize);
+            engine.runRenderLoop(() => renderScene.render());
 
-    return () => {
-      cleanupScene(engine);
-      window.removeEventListener('resize', resize);
-    };
-  };
+            sceneRef.current = renderScene;
 
-  // Setup the camera
-  const setupCamera = (scene: BABYLON.Scene) => {
-    const camera = new BABYLON.ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 4, 5, BABYLON.Vector3.Zero(), scene);
-    camera.attachControl(canvasRef.current, true);
-  };
-
-  // Setup the light
-  const setupLight = (scene: BABYLON.Scene) => {
-    new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
-  };
-
-  // Setup the ground
-  const setupGround = (scene: BABYLON.Scene) => {
-    const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 10, height: 10 }, scene);
-    const groundMaterial = new BABYLON.StandardMaterial('groundMaterial', scene);
-    groundMaterial.diffuseColor = new BABYLON.Color3(0, 1, 0); // Green color
-    ground.material = groundMaterial;
-    groundRef.current = ground;
-  };
-
-  // Setup the cylinder (player) mesh
-  const setupCylinderMesh = (scene: BABYLON.Scene) => {
-    const cylinderMesh = BABYLON.MeshBuilder.CreateCylinder(
-      'cylinder',
-      { diameterTop: 0.5, diameterBottom: 0.5, height: 1 },
-      scene
-    );
-    cylinderMesh.setEnabled(false);
-    cylinderMeshRef.current = cylinderMesh; // Store the reference to the cylinder mesh
-  };
-
-  // Cleanup the scene when the component unmounts
-  const cleanupScene = (engine: BABYLON.Engine) => {
-    if (sceneRef.current) {
-      sceneRef.current.dispose();
-    }
-    engine.dispose();
-  };
-
-  // Move the player when the ground is clicked to the clicked position
-  const handleGroundClick = (event: BABYLON.PointerInfo) => {
-    if (sceneRef.current && event.event.button === 0) {
-      const pickResult = sceneRef.current.pick(sceneRef.current.pointerX, sceneRef.current.pointerY);
-      if (pickResult && pickResult.hit && pickResult.pickedMesh === groundRef.current && client_id) {
-        const newPosition = pickResult.pickedPoint;
-        if (newPosition) {
-          newPosition.y = 0.5;
-          updatePlayerPosition(newPosition);
-        }
-      }
-    }
-  };
-
-  // Update the player position in the room state
-  const updatePlayerPosition = (newPosition: BABYLON.Vector3) => {
-    const playerData: IPlayerData = {
-      id: client_id,
-      position: {
-        x: newPosition.x,
-        y: newPosition.y,
-        z: newPosition.z,
-      },
-    };
-    movePlayer(playerData);
-  };
-
-  // Send the player position to the server
-  const movePlayer = (playerData: IPlayerData) => {
-    room.send('move_player', playerData);
-  };
-
-  // Call the initializeScene function only once (when the component mounts)
-  useEffect(() => {
-    initializeScene();
-  }, []);
-
-  // Update the player meshes when the players array changes
-  useEffect(() => {
-    if (sceneRef.current && groundRef.current) {
-      updatePlayerMeshes(players);
-    }
-  }, [players]);
-
-  // Update the player meshes when the client_id changes
-  const updatePlayerMeshes = (players: Player[]) => {
-    const activePlayerIds = new Set<string>();
-
-    players.forEach((player) => {
-      if (player.position && sceneRef.current) {
-        activePlayerIds.add(player.id);
-
-        let cloneMesh = instanceMeshesRef.current.get(player.id) as unknown as BABYLON.Mesh;
-
-        if (!cloneMesh) {
-          cloneMesh = createNewPlayerMesh(player.id, cylinderMeshRef.current!);
+            window.addEventListener('resize', function () {
+                engine.resize();
+            });
         }
 
-        cloneMesh.position = new BABYLON.Vector3(player.position.x, player.position.y, player.position.z);
-
-        if (player.id === client_id) {
-          customizeClientMesh(cloneMesh);
-          sceneRef.current.onPointerObservable.add(handleGroundClick, BABYLON.PointerEventTypes.POINTERDOWN);
+        // Create the existing players/update player positions
+        if (sceneRef.current &&
+            players.length > 1 &&
+            client_id &&
+            !mountedExistingPlayers.current
+        ) {
+            createExistingPlayers(players, client_id, sceneRef.current);
+            mountedExistingPlayers.current = true;
         }
 
-        cloneMesh.setEnabled(true);
-      }
-    });
+        // Update player positions in a smooth way
+        if (sceneRef.current && players.length > 1) {
+            movePlayers()
+        }
+    }, [players, client_id]);
 
-    // Remove the meshes of inactive players (that left the room)
-    removeInactivePlayerMeshes(activePlayerIds);
-  };
+    // Move players in a smooth way
+    const movePlayers = () => {
+        players.forEach((player) => {
+            if (player.id !== client_id) {
+                const playerMesh = sceneRef.current?.getMeshByName(player.id);
 
-  // Create a new player (cylinder) mesh
-  const createNewPlayerMesh = (playerId: string, cylinderMesh: BABYLON.Mesh) => {
-    const cloneMesh = cylinderMesh.clone(playerId);
-    instanceMeshesRef.current.set(playerId, cloneMesh as unknown as BABYLON.InstancedMesh);
-    return cloneMesh;
-  };
+                if (playerMesh) {
+                    const playerPosition = new BABYLON.Vector3(player.position.x, player.position.y, player.position.z);
+                    const animation = new BABYLON.Animation("playerAnimation", "position", 1, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+                    const keys = [];
+                    keys.push({
+                        frame: 0,
+                        value: playerMesh.position
+                    });
+                    keys.push({
+                        frame: 1,
+                        value: playerPosition
+                    });
+                    animation.setKeys(keys);
+                    playerMesh.animations = [];
+                    playerMesh.animations.push(animation);
+                    sceneRef.current?.beginAnimation(playerMesh, 0, 1, false, 4); // 4 indicates animation speed
+                }
+            }
+        });
+    }
 
-  // Customize the client player mesh to make it red
-  const customizeClientMesh = (cloneMesh: BABYLON.Mesh) => {
-    const material = new BABYLON.StandardMaterial('material', sceneRef.current!);
-    material.diffuseColor = new BABYLON.Color3(1, 0, 0);
-    cloneMesh.material = material;
-  };
+    // Create new players
+    useEffect(() => {
+        if (mountedExistingPlayers.current && newestPlayer) {
+            createNewPlayers(newestPlayer, client_id, sceneRef.current);
+        }
+    }, [mountedExistingPlayers.current, newestPlayer]);
 
-  // Remove the meshes of inactive players (that left the room)
-  const removeInactivePlayerMeshes = (activePlayerIds: Set<string>) => {
-    instanceMeshesRef.current.forEach((instanceMesh, playerId) => {
-      if (!activePlayerIds.has(playerId)) {
-        instanceMesh.dispose();
-        instanceMeshesRef.current.delete(playerId);
-      }
-    });
-  };
+    // Update the GUI when a player joins or leaves
+    useEffect(() => {
+        if (sceneRef.current) createGUI({ room, players, client_id, chatMessages });
+    }, [players, chatMessages]);
 
-  // Render the canvas html element
-  return <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />;
-};
+    // Remove player
+    useEffect(() => {
+        if (playerLeft !== '') {
+            const playerToRemove = sceneRef.current?.getMeshByName(playerLeft);
+            if (playerToRemove) {
+                playerToRemove.dispose();
+            }
+        }
+    }, [playerLeft]);
 
-export default BabylonScene;
+    return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />;
+}

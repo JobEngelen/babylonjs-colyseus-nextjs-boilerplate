@@ -44,10 +44,11 @@ export class MyRoom extends Room<MyRoomState> {
     // Set the player position
     const position = new Position();
     position.x = randomX;
-    position.y = 0.5; // You can set the Y position here
+    position.y = 1.7; // You can set the Y position here
     position.z = randomZ;
 
     player.position = position;
+    player.lastPosition = position;
     // Add the player to the state
     this.state.players.set(player.id, player);
 

@@ -9,6 +9,7 @@ export class Position extends Schema {
 export class Player extends Schema {
   @type('string') id: string;
   @type(Position) position: Position;
+  @type(Position) lastPosition: Position;
 }
 
 export class MyRoomState extends Schema {

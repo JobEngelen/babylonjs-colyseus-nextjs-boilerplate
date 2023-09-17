@@ -11,7 +11,8 @@ const Page = () => {
   const [room, setRoom] = useState<Room<MyRoomState> | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [chatMessages, setChatMessages] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState<string>('');
+  const [newestPlayer, setNewestPlayer] = useState<Player | null>(null);
+  const [playerLeft, setPlayerLeft] = useState<string>('');
 
   // Handle the input change
   useEffect(() => {
@@ -43,26 +44,36 @@ const Page = () => {
 
     // Listen for changes to the room state and update the player list
     joinedRoom.onMessage('*', (type, message) => {
+
       if (message.type === 'player_joined') {
+
         // Add player to the end of the list, but not if it's already there
         setPlayers((prevPlayers) => {
           if (prevPlayers.includes(message.playerId)) return prevPlayers;
           else return [...prevPlayers, message.playerId];
         });
+
         setChatMessages((prevMessages) => [
           ...prevMessages,
           `${message.playerId} joined the room.`,
         ]);
+
       } else if (message.type === 'player_left') {
+
         // Remove player from the list if they leave
         setPlayers((prevPlayers) =>
           prevPlayers.filter((player) => player !== message.playerId)
         );
+
+        setPlayerLeft(message.playerId);
+
         setChatMessages((prevMessages) => [
           ...prevMessages,
           `${message.playerId} left the room.`,
         ]);
+
       }
+
     });
 
     // Listen for chat messages and add them to the chatMessages array
@@ -73,80 +84,35 @@ const Page = () => {
     // Listen for changes to the room state and update the player list
     joinedRoom.onStateChange((newState) => {
       const playersArray = Array.from(newState.players.values());
+
+      // Look for player that is not in players array but is in playersArray
+      // If found, set them as newest player
+      playersArray.forEach((player: Player) => {
+        if (!players.includes(player)) {
+          setNewestPlayer(player);
+        }
+      });
+
       setPlayers(playersArray);
     });
   };
 
-  // Send a chat message to the server
-  const sendChatMessage = (message: string) => {
-    if (room) {
-      // Construct a message object with the player's name and message content
-      const chatMessage = `${room.sessionId}: ${message}`;
-
-      // Broadcast the chat message to all clients
-      room.send('chat_message', { content: chatMessage });
-    }
-  };
-
-  // Handle the form submission
-  const handleSubmitChatMessage = (e: any) => {
-    e.preventDefault();
-    sendChatMessage(inputValue);
-    setInputValue('');
-  };
-
   return (
-    <div>
-      <h1>Welcome to Room <u>{roomName}</u></h1>
-      <h3>Players in room: {room?.state.players.size}</h3>
-
-      {room && (
-        <div>
-          Current people in the room ({players.length}):
-          <ul>
-            {players.filter((player: Player) => player.position).map((player: Player, index: number) => (
-              <li key={index}>
-                {
-                  player.id === room.sessionId ? <b>{player.id}</b>
-                    : <>{player.id}</>
-                }
-                - {`{${player.position.x}, ${player.position.y}, ${player.position.z}}`}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      < hr />
-
-      <div>
-        <h3>Chat</h3>
-        {chatMessages.map((message, index) => (
-          <div key={index}>{message}</div>
-        ))}
-        <input
-          type="text"
-          placeholder="Type a message..."
-          onChange={(e) => setInputValue(e.target.value)}
-          value={inputValue}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              sendChatMessage(inputValue);
-              setInputValue('');
-            }
-          }}
-        />
-        <button onClick={handleSubmitChatMessage} disabled={!inputValue}>Send</button>
-      </div>
-
-      <hr />
+    <>
 
       {
-        room ? <BabylonScene room={room} players={players} client_id={room.sessionId} />
+        room ? <BabylonScene
+          room={room}
+          players={players}
+          client_id={room.sessionId}
+          newestPlayer={newestPlayer}
+          playerLeft={playerLeft}
+          chatMessages={chatMessages}
+        />
           : <div>loading...</div>
       }
 
-    </div >
+    </>
   );
 };
 
